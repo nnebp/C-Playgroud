@@ -1,45 +1,121 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "Texture.h"
 
+//TODO not global
+TTF_Font *font = NULL;
+SDL_Texture* gTexture;
+//The window renderer
+SDL_Renderer* gRenderer = NULL;
 
-bool init(SDL_Window* gWindow, SDL_Surface* gScreenSurface, int screenWidth, int screenHeight) {
+//Screen dimension constants
+//TODO no longer global?
+const int SCREEN_WIDTH = 640;
+const int SCREEN_HEIGHT = 480;
+int width;
+int height;
+
+//The window we'll be rendering to
+SDL_Window* gWindow = NULL;
+
+bool init(SDL_Window** gWindow, int screenWidth, int screenHeight) {
     //Initialization flag
     bool success = true;
 
     //Initialize SDL
     if( SDL_Init( SDL_INIT_VIDEO ) < 0 )
     {
-        printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError() );
+        printf( "SDL could not initialize! SDL Error: %s\n", SDL_GetError() );
         success = false;
     }
     else
     {
+        //Set texture filtering to linear
+        if( !SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "1" ) )
+        {
+            printf( "Warning: Linear texture filtering not enabled!" );
+        }
+
         //Create window
-        gWindow = SDL_CreateWindow( "SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenWidth, screenHeight, SDL_WINDOW_SHOWN );
+        gWindow = SDL_CreateWindow( "SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
         if( gWindow == NULL )
         {
-            printf( "Window could not be created! SDL_Error: %s\n", SDL_GetError() );
+            printf( "Window could not be created! SDL Error: %s\n", SDL_GetError() );
             success = false;
         }
         else
         {
-            //Get window surface
-            gScreenSurface = SDL_GetWindowSurface( gWindow );
+            //Create vsynced renderer for window
+            gRenderer = SDL_CreateRenderer( gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC );
+            if( gRenderer == NULL )
+            {
+                printf( "Renderer could not be created! SDL Error: %s\n", SDL_GetError() );
+                success = false;
+            }
+            else
+            {
+                //Initialize renderer color
+                SDL_SetRenderDrawColor( gRenderer, 0xFF, 0xFF, 0xFF, 0xFF );
+
+                //Initialize PNG loading
+                int imgFlags = IMG_INIT_PNG;
+                if( !( IMG_Init( imgFlags ) & imgFlags ) )
+                {
+                    printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
+                    success = false;
+                }
+
+                //Initialize SDL_ttf
+                if( TTF_Init() == -1 )
+                {
+                    printf( "SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError() );
+                    success = false;
+                }
+            }
         }
     }
 
-    printf("is gwindow null? %d", gWindow == NULL);
     return success;
 }
 
-bool loadMedia(SDL_Surface* surface) {
+bool loadMedia()
+{
+    //Loading success flag
+    bool success = true;
+
+    //Open the font
+    font = TTF_OpenFont( "/home/something/Dev/C-Playgroud/TextTest/alterebro-pixel-font.ttf", 28 );
+    if( font == NULL )
+    {
+        printf( "Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError() );
+        success = false;
+    }
+    else
+    {
+        //Render text
+        SDL_Color textColor = { 0, 0, 0 };
+        //if( !gTextTexture.loadFromRenderedText( "The quick brown fox jumps over the lazy dog", textColor ) )
+        if(!loadFromRenderedText("The quick brown fox jumps over the lazy dog", textColor, &gTexture, font, gRenderer, &width, &height)) {
+        //if( !loadFromRenderedText( "The quick brown fox jumps over the lazy dog", textColor, &gTexture, font ) )
+
+            printf( "Failed to render text texture!\n" );
+            success = false;
+        }
+    }
+
+    return success;
+}
+/*
+bool loadMedia(SDL_Surface** surface) {
     //Loading success flag
     bool success = true;
 
     //Load splash image
-    surface = SDL_LoadBMP( "./hello_world.bmp" );
-    if( surface == NULL )
+    *surface = SDL_LoadBMP( "/home/something/Dev/C-Playgroud/TextTest/hello_world.bmp" );
+    if( *surface == NULL )
     {
         printf( "Unable to load image %s! SDL Error: %s\n", "./hello_world.bmp", SDL_GetError() );
         success = false;
@@ -47,43 +123,68 @@ bool loadMedia(SDL_Surface* surface) {
 
     return success;
 }
+ */
+
+void closeAll(SDL_Window** gWindow, SDL_Surface** gHelloWorld) {
+    //Deallocate surface
+    SDL_FreeSurface( *gHelloWorld );
+    *gHelloWorld = NULL;
+
+    //Destroy window
+    SDL_DestroyWindow( *gWindow );
+    *gWindow = NULL;
+
+    //Quit SDL subsystems
+    SDL_Quit();
+}
 
 int main(int argc, char* args[]) {
 
-    //The window we'll be rendering to
-    SDL_Window* gWindow = NULL;
-
-    //The surface contained by the window
-    SDL_Surface* gScreenSurface = NULL;
-
-    //The image we will load and show on the screen
-    SDL_Surface* gHelloWorld = NULL;
-
-
     //Start up SDL and create window
-    if(!init(gWindow, gScreenSurface, 1000, 1000))
+    if( !init(gWindow, SCREEN_HEIGHT, SCREEN_HEIGHT) )
     {
         printf( "Failed to initialize!\n" );
     }
     else
     {
         //Load media
-        if(!loadMedia(gHelloWorld))
+        if( !loadMedia() )
         {
             printf( "Failed to load media!\n" );
         }
         else
         {
-            //Apply the image
-            printf( "blit result: %d", SDL_BlitSurface( gHelloWorld, NULL, gScreenSurface, NULL ));
-            printf( "helloWorld null?: %d", (NULL != gHelloWorld));
-            printf( "gScreenSurface null?: %d", (NULL != gScreenSurface));
+            //Main loop flag
+            bool quit = false;
 
-            //Update the surface
-            SDL_UpdateWindowSurface( gWindow );
+            //Event handler
+            SDL_Event e;
 
-            //Wait two seconds
-            SDL_Delay( 2000 );
+            //While application is running
+            while( !quit )
+            {
+                //Handle events on queue
+                while( SDL_PollEvent( &e ) != 0 )
+                {
+                    //User requests quit
+                    if( e.type == SDL_QUIT )
+                    {
+                        quit = true;
+                    }
+                }
+
+                //Clear screen
+                SDL_SetRenderDrawColor( gRenderer, 0xFF, 0xFF, 0xFF, 0xFF );
+                SDL_RenderClear( gRenderer );
+
+                //Render current frame
+                //gTextTexture.render( ( SCREEN_WIDTH - gTextTexture.getWidth() ) / 2, ( SCREEN_HEIGHT - gTextTexture.getHeight() ) / 2 );
+                render(222, 222, height, width, NULL, 0.0, NULL, SDL_FLIP_NONE, &gTexture, gRenderer);
+                //render( ( SCREEN_WIDTH - gTextTexture.getWidth() ) / 2, ( SCREEN_HEIGHT - gTextTexture.getHeight() ) / 2 );
+
+                //Update screen
+                SDL_RenderPresent( gRenderer );
+            }
         }
     }
 

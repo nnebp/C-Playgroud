@@ -1,12 +1,16 @@
 #include <SDL2/SDL_system.h>
-/TODO ^ is this needed?
+//TODO ^ is this needed?
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <stdbool.h>
 
-bool loadFromRenderedText(char* textureText, SDL_Color textColor, SDL_Texture** texture, TTF_Font *font) {
+//TODO Make texture a struct with width and height
+bool loadFromRenderedText(char* textureText, SDL_Color textColor, SDL_Texture** texture, TTF_Font *font, SDL_Renderer* renderer, int* width, int* height) {
     //Get rid of preexisting texture
     //TODO do we need this even. maybe. it just frees the texture
     //free();
+    //TODO delete
+    printf("text is: %s",textureText);
 
     //Render text surface
     SDL_Surface* textSurface = TTF_RenderText_Solid( font, textureText, textColor );
@@ -17,8 +21,8 @@ bool loadFromRenderedText(char* textureText, SDL_Color textColor, SDL_Texture** 
     else
     {
         //Create texture from surface pixels
-        *texture = SDL_CreateTextureFromSurface( gRenderer, textSurface );
-        if( mTexture == NULL )
+        *texture = SDL_CreateTextureFromSurface( renderer, textSurface );
+        if( *texture == NULL )
         {
             printf( "Unable to create texture from rendered text! SDL Error: %s\n", SDL_GetError() );
         }
@@ -26,8 +30,8 @@ bool loadFromRenderedText(char* textureText, SDL_Color textColor, SDL_Texture** 
         {
             //Get image dimensions
             //TODO is the neccessary for the texture? create texture struct??
-            //mWidth = textSurface->w;
-            //mHeight = textSurface->h;
+            *width = textSurface->w;
+            *height = textSurface->h;
         }
 
         //Get rid of old surface
@@ -40,7 +44,8 @@ bool loadFromRenderedText(char* textureText, SDL_Color textColor, SDL_Texture** 
 
 }
 
-void render( int x, int y, int height, int width, SDL_Rect* clip, double angle, SDL_Point* center, SDL_RendererFlip flip, SDL_Texture** texture)
+//TODO move vars around + defaults
+void render( int x, int y, int height, int width, SDL_Rect* clip, double angle, SDL_Point* center, SDL_RendererFlip flip, SDL_Texture** texture, SDL_Renderer* renderer)
 {
     //Set rendering space and render to screen
     SDL_Rect renderQuad = { x, y, width, height };
@@ -53,7 +58,7 @@ void render( int x, int y, int height, int width, SDL_Rect* clip, double angle, 
     }
 
     //Render to screen
-    SDL_RenderCopyEx( gRenderer, *texture, clip, &renderQuad, angle, center, flip );
+    SDL_RenderCopyEx( renderer, *texture, clip, &renderQuad, angle, center, flip );
 }
 
 /*SDL_Texture* finalTexture;
